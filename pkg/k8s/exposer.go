@@ -2,11 +2,11 @@ package k8s
 
 import (
 	"errors"
+	"github.com/omrikiei/ktunnel/pkg/common"
 	log "github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"ktunnel/pkg/common"
 	"time"
 )
 
@@ -15,9 +15,9 @@ var supportedSchemes = map[string]v12.Protocol{
 	"ufp": v12.ProtocolUDP,
 }
 
-func ExposeAsService(namespace, name *string, tunnelPort int, scheme string, rawPorts []string, readyChan chan<- bool) error {
+func ExposeAsService(namespace, name *string, tunnelPort int, scheme string, rawPorts []string, image string, readyChan chan<- bool) error {
 	getClients(namespace)
-	deployment := newDeployment(*namespace, *name, tunnelPort)
+	deployment := newDeployment(*namespace, *name, tunnelPort, image)
 
 	ports := make([]v12.ServicePort, len(rawPorts))
 	protocol, ok := supportedSchemes[scheme]
@@ -35,7 +35,7 @@ func ExposeAsService(namespace, name *string, tunnelPort int, scheme string, raw
 			Port:     parsed.Source,
 			TargetPort: intstr.IntOrString{
 				Type:   intstr.Int,
-				IntVal: parsed.Target,
+				IntVal: parsed.Source,
 				StrVal: "",
 			},
 		}
@@ -52,7 +52,7 @@ func ExposeAsService(namespace, name *string, tunnelPort int, scheme string, raw
 		return err
 	}
 	log.Infof("Exposed service's cluster ip is: %s", newSvc.Spec.ClusterIP)
-	waitForReady(name, &creationTime, *deployment.Spec.Replicas, readyChan)
+	waitForReady(name, creationTime, *deployment.Spec.Replicas, readyChan)
 	return nil
 }
 
